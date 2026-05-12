@@ -1,0 +1,24 @@
+# Virtual Environment (Bohat bhari hota hai aur har machine ka apna hota hai)
+venv/
+ENV/
+env/
+
+# Python Compiled files (Inki zarurat nahi hoti)
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment Variables (Isme sensitive passwords/keys hoti hain)
+.env
+.flaskenv
+
+# IDE Settings (Aapke personal VS Code ki settings)
+.vscode/
+.idea/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Docker (Agar aap local machine par images build karte hain)
+*.tar

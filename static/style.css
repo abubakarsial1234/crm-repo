@@ -1,0 +1,24 @@
+/* static/style.css */
+/* Ye hamari custom CSS hai jo Tailwind ke sath mil kar kaam karegi */
+
+body {
+    /* Font ko aur zyada smooth aur clear banata hai */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Table ki row par jab mouse aaye to aik pyara sa shadow effect aaye */
+tbody tr {
+    transition: all 0.3s ease;
+}
+
+tbody tr:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+    cursor: pointer;
+}
+
+/* Heading ko thora sa glow effect dene ke liye */
+h1 {
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+}
