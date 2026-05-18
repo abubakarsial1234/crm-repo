@@ -6,11 +6,12 @@ on:
       - main
 
 env:
-  AWS_REGION: us-east-1                     # Aapka AWS Region
-  ECR_REPOSITORY: practice-ecr               # Jo ECR repo aapne banayi hai
-  ECS_CLUSTER: practice-cluster             # Aapke ECS Cluster ka naam
-  ECS_SERVICE: crm-service                  # Aapki ECS Service ka naam
-  CONTAINER_NAME: practice-container             # Task Definition ke andar container ka naam
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: practice-ecr
+  ECS_CLUSTER: practice-cluster
+  ECS_SERVICE: practice-service
+  ECS_TASK_DEFINITION: practice-task-definition
+  CONTAINER_NAME: practice-container
 
 jobs:
   setup-build-publish:
@@ -21,7 +22,7 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    # 1. AWS par authenticate karein (GCP Auth ki jagah)
+    # 1. AWS par authenticate karein
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -45,23 +46,23 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    # 4. AWS se current Task Definition download karein (Taake static JSON file maintain na karni pare)
+    # 4. AWS se current Task Definition download karein
     - name: Download active task definition
       run: |
-        aws ecs describe-task-definition --task-definition ${{ env.CONTAINER_NAME }} --query taskDefinition > task-definition.json
+        aws ecs describe-task-definition --task-definition ${{ env.ECS_TASK_DEFINITION }} --query taskDefinition > task-definition.json
 
     # 5. Task Definition mein naye Docker image tag ko map karein
     - name: Fill in the new image ID in the Amazon ECS task definition
       id: task-def
-      uses: aws-actions/amazon-ecs-render-task-definition@v2
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
         task-definition: task-definition.json
         container-name: ${{ env.CONTAINER_NAME }}
         image: ${{ steps.build-image.outputs.image }}
 
-    # 6. Nayi Task Definition ko ECS Service par deploy karein (GKE Rollout ki jagah)
+    # 6. Nayi Task Definition ko ECS Service par deploy update karein
     - name: Deploy Amazon ECS task definition
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
       with:
         task-definition: ${{ steps.task-def.outputs.task-definition }}
         service: ${{ env.ECS_SERVICE }}
