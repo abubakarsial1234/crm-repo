@@ -1,0 +1,46 @@
+name: Build and Push to GCP Artifact Registry
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: crm-production-system
+  REGION: us-central1
+  REPOSITORY: crm-docker-repo
+  IMAGE: crm-app
+
+jobs:
+  setup-build-publish:
+    name: Setup, Build, and Publish
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    # 1. Google Cloud par authenticate karein JSON key se
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+    # 2. gcloud CLI setup karein
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    # 3. Docker ko registry ke liye configure karein
+    - name: Configure Docker for GCP
+      run: |
+        gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+    # 4. Docker Image ko Build karein
+    - name: Build Docker Image
+      run: |
+        docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }} .
+
+    # 5. Image ko Artifact Registry mein Push karein
+    - name: Push Docker Image to Artifact Registry
+      run: |
+        docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}
