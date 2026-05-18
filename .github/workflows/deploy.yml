@@ -46,10 +46,12 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    # 4. AWS se current Task Definition download karein
-    - name: Download active task definition
+    # 4. AWS se current Task Definition download karein aur un-wanted parameters clean karein
+    - name: Download and Sanitize task definition
       run: |
-        aws ecs describe-task-definition --task-definition ${{ env.ECS_TASK_DEFINITION }} --query taskDefinition > task-definition.json
+        aws ecs describe-task-definition --task-definition ${{ env.ECS_TASK_DEFINITION }} --query taskDefinition > raw-task-definition.json
+        # jq use kar ke enableFaultInjection aur baqi metadata keys ko remove kar rahe hain
+        jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy, .enableFaultInjection)' raw-task-definition.json > task-definition.json
 
     # 5. Task Definition mein naye Docker image tag ko map karein
     - name: Fill in the new image ID in the Amazon ECS task definition
