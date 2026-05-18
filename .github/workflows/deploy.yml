@@ -10,6 +10,8 @@ env:
   REGION: us-central1
   REPOSITORY: crm-docker-repo
   IMAGE: crm-app
+  CLUSTER_NAME: crm-1-deployment-cluster   # 👈 Aapke naye cluster ka naam
+  DEPLOYMENT_NAME: crm-1-deployment         # 👈 Aapki deployment ka naam
 
 jobs:
   setup-build-publish:
@@ -20,7 +22,7 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    # 1. Google Cloud par authenticate karein JSON key se
+    # 1. Google Cloud par authenticate karein
     - name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v2
       with:
@@ -44,3 +46,16 @@ jobs:
     - name: Push Docker Image to Artifact Registry
       run: |
         docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}
+
+    # 6. Kubeconfig ke zariye GKE Cluster se connect karein
+    - name: Get GKE Credentials
+      uses: google-github-actions/get-gke-credentials@v2
+      with:
+        cluster_name: ${{ env.CLUSTER_NAME }}
+        location: ${{ env.REGION }}
+
+    # 7. Kubernetes Deployment ko naye image tag ke sath update (Rollout) karein
+    - name: Deploy Update to GKE Cluster
+      run: |
+        kubectl set image deployment/${{ env.DEPLOYMENT_NAME }} *=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}
+        kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }}
