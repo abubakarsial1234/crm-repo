@@ -1,5 +1,5 @@
-# Base image Python 3.9
-FROM python:3.9-slim
+# Base image Python 3.11 (Upgraded from 3.9 to fix click package version mismatch)
+FROM python:3.11-slim
 
 WORKDIR /app
 
