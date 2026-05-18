@@ -1,4 +1,4 @@
-name: Build and Push to GCP Artifact Registry
+name: Build and Push to Amazon ECR and Deploy to ECS
 
 on:
   push:
@@ -6,56 +6,64 @@ on:
       - main
 
 env:
-  PROJECT_ID: crm-production-system
-  REGION: us-central1
-  REPOSITORY: crm-docker-repo
-  IMAGE: crm-app
-  CLUSTER_NAME: crm-1-deployment-cluster   # 👈 Aapke naye cluster ka naam
-  DEPLOYMENT_NAME: crm-1-deployment         # 👈 Aapki deployment ka naam
+  AWS_REGION: us-east-1                     # Aapka AWS Region
+  ECR_REPOSITORY: practice-ecr               # Jo ECR repo aapne banayi hai
+  ECS_CLUSTER: practice-cluster             # Aapke ECS Cluster ka naam
+  ECS_SERVICE: crm-service                  # Aapki ECS Service ka naam
+  CONTAINER_NAME: practice-container             # Task Definition ke andar container ka naam
 
 jobs:
   setup-build-publish:
-    name: Setup, Build, and Publish
+    name: Setup, Build, Publish and Deploy
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    # 1. Google Cloud par authenticate karein
-    - name: Authenticate to Google Cloud
-      uses: google-github-actions/auth@v2
+    # 1. AWS par authenticate karein (GCP Auth ki jagah)
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
       with:
-        credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
 
-    # 2. gcloud CLI setup karein
-    - name: Set up Cloud SDK
-      uses: google-github-actions/setup-gcloud@v2
+    # 2. Amazon ECR registry par login karein
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
 
-    # 3. Docker ko registry ke liye configure karein
-    - name: Configure Docker for GCP
+    # 3. Docker Image ko Build, Tag aur ECR par Push karein
+    - name: Build, Tag, and Push Image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
       run: |
-        gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    # 4. Docker Image ko Build karein
-    - name: Build Docker Image
+    # 4. AWS se current Task Definition download karein (Taake static JSON file maintain na karni pare)
+    - name: Download active task definition
       run: |
-        docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }} .
+        aws ecs describe-task-definition --task-definition ${{ env.CONTAINER_NAME }} --query taskDefinition > task-definition.json
 
-    # 5. Image ko Artifact Registry mein Push karein
-    - name: Push Docker Image to Artifact Registry
-      run: |
-        docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}
-
-    # 6. Kubeconfig ke zariye GKE Cluster se connect karein
-    - name: Get GKE Credentials
-      uses: google-github-actions/get-gke-credentials@v2
+    # 5. Task Definition mein naye Docker image tag ko map karein
+    - name: Fill in the new image ID in the Amazon ECS task definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v2
       with:
-        cluster_name: ${{ env.CLUSTER_NAME }}
-        location: ${{ env.REGION }}
+        task-definition: task-definition.json
+        container-name: ${{ env.CONTAINER_NAME }}
+        image: ${{ steps.build-image.outputs.image }}
 
-    # 7. Kubernetes Deployment ko naye image tag ke sath update (Rollout) karein
-    - name: Deploy Update to GKE Cluster
-      run: |
-        kubectl set image deployment/${{ env.DEPLOYMENT_NAME }} *=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:${{ github.sha }}
-        kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }}
+    # 6. Nayi Task Definition ko ECS Service par deploy karein (GKE Rollout ki jagah)
+    - name: Deploy Amazon ECS task definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ env.ECS_SERVICE }}
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true
