@@ -7,12 +7,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'super-secret-key-for-crm'
 
-# 🗄️ Local Database Connection Configuration
-# Docker Network ke andar 'mysql-db' host name use hota hai aur container ke bahar 'localhost'
-LOCAL_DB_URI = "mysql+pymysql://crm_user:crm_password@mysql-db:3306/crm_db"
-
-# Agar environment variable set hai toh wo chalayega, nahi toh local connection setting uthaye ga
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', LOCAL_DB_URI)
+# 🗄️ Local Container Database Connection Configuration
+# Docker Network ke andar hum direct container ka naam 'mysql-db' batayenge
+app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+pymysql://crm_user:crm_password@mysql-db:3306/crm_db"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -87,7 +84,7 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-# Automated Table Creation on local MySQL
+# Automated Table Creation (Jaise hi app chalegi, local MySQL container me tables khud ban jayenge)
 with app.app_context():
     db.create_all()
 
