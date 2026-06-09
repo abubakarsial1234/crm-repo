@@ -1,5 +1,4 @@
 import os
-import urllib.parse
 from flask import Flask, render_template, redirect, url_for, request, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -8,17 +7,12 @@ from werkzeug.security import generate_password_hash, check_password_hash
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'super-secret-key-for-crm'
 
-# 🗄️ GCP Cloud SQL Connection Configuration
-DB_USER = "crm-admin"
-DB_PASSWORD = "Loa71361089@"  # Aapka asli password
-DB_HOST = "34.57.41.223"      # Aapka GCP IP
-DB_NAME = "crm_production_db" # Sahi database ka naam (GCP par yehi banana hai)
+# 🗄️ Local Database Connection Configuration
+# Docker Network ke andar 'mysql-db' host name use hota hai aur container ke bahar 'localhost'
+LOCAL_DB_URI = "mysql+pymysql://crm_user:crm_password@mysql-db:3306/crm_db"
 
-# Password ko safely URL-encode kar rahe hain taake '@' masla na kare
-ENCODED_PASSWORD = urllib.parse.quote_plus(DB_PASSWORD)
-
-# Final Connection String
-app.config['SQLALCHEMY_DATABASE_URI'] = f"mysql+pymysql://{DB_USER}:{ENCODED_PASSWORD}@{DB_HOST}/{DB_NAME}"
+# Agar environment variable set hai toh wo chalayega, nahi toh local connection setting uthaye ga
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', LOCAL_DB_URI)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -93,7 +87,7 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-# Automated Table Creation on GCP
+# Automated Table Creation on local MySQL
 with app.app_context():
     db.create_all()
 
