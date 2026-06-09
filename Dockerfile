@@ -19,3 +19,5 @@ EXPOSE 5000
 
 # Container chalne par ye command run hogi
 CMD ["flask", "run"]
+
+
